@@ -42,20 +42,19 @@ const SUPABASE_URL = "https://fxjryfnbtlsxlxtoyuru.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_80ftUn5e24ccuFfTTsHGdg_tMTp56_8";
 // =====================================================================
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// >>> CAMBIO CLAVE: usamos "supabaseClient" en vez de "supabase" <<<
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.getElementById("app");
 const topbar = document.getElementById("topbar");
 const usuarioActivoSpan = document.getElementById("usuarioActivo");
 
-// Este es el codigo que la etiqueta NFC entrega en la URL, ej:
-// https://tu-sitio.github.io/index.html?equipo=EQLAB001
 const params = new URLSearchParams(window.location.search);
 const equipoId = params.get("equipo");
 
 // -------------------- INICIO --------------------
 
 async function init() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
     mostrarLogin();
   } else {
@@ -67,10 +66,6 @@ async function init() {
 }
 
 // -------------------- AUTENTICACIÓN --------------------
-// El alumno ve "usuario / contraseña". Por dentro se traduce a un correo
-// interno (no real) porque Supabase Auth exige ese formato. El alumno
-// nunca ve ni necesita un correo de verdad, ni tiene cuenta en Supabase:
-// su cuenta vive dentro de esta app.
 
 function correoInterno(usuario) {
   return `${usuario.trim().toLowerCase()}@insignia.local`;
@@ -109,8 +104,8 @@ async function autenticar(modo) {
 
   const email = correoInterno(usuario);
   const { error } = modo === "signup"
-    ? await supabase.auth.signUp({ email, password })
-    : await supabase.auth.signInWithPassword({ email, password });
+    ? await supabaseClient.auth.signUp({ email, password })
+    : await supabaseClient.auth.signInWithPassword({ email, password });
 
   if (error) {
     msg.innerHTML = `<span class="err">${error.message}</span>`;
@@ -127,7 +122,7 @@ async function autenticar(modo) {
 }
 
 async function cerrarSesion() {
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
   localStorage.removeItem("insignia_usuario");
   init();
 }
@@ -140,7 +135,7 @@ async function cargarEquipo(codigoAlumno) {
     return;
   }
 
-  const { data: equipo, error: errEquipo } = await supabase
+  const { data: equipo, error: errEquipo } = await supabaseClient
     .from("equipos").select("*").eq("codigoEq", equipoId).single();
 
   if (errEquipo || !equipo) {
@@ -148,13 +143,12 @@ async function cargarEquipo(codigoAlumno) {
     return;
   }
 
-  const { data: practica } = await supabase
+  const { data: practica } = await supabaseClient
     .from("practicas").select("*").eq("codigoEq", equipoId).single();
 
-  const { data: materiales } = await supabase
+  const { data: materiales } = await supabaseClient
     .from("material_didactico").select("*");
 
-  // --- Tarjeta de información del equipo ---
   app.innerHTML = `
     <h1>${equipo.tipo} <span class="badge">${equipo.codigoEq}</span></h1>
     <p class="muted">${equipo.marca || ""} ${equipo.modelo || ""}</p>
@@ -169,7 +163,6 @@ async function cargarEquipo(codigoAlumno) {
     return;
   }
 
-  // --- Tarjeta de la práctica / formulario ---
   const opcionesMaterial = (materiales || [])
     .map(m => `<option value="${m.codMat}">${m.nombre}</option>`)
     .join("");
@@ -198,7 +191,6 @@ async function cargarEquipo(codigoAlumno) {
   `;
   document.body.appendChild(formCard);
 
-  // Vista previa local del PDF antes de enviarlo (visor de PDF)
   document.getElementById("archivo").addEventListener("change", (e) => {
     const file = e.target.files[0];
     const visor = document.getElementById("visorPdf");
@@ -228,7 +220,7 @@ async function cargarEquipo(codigoAlumno) {
     let archivoUrl = null;
     if (archivo) {
       const ruta = `${equipoId}/${codigoAlumno}-${Date.now()}-${archivo.name}`;
-      const { error: errSubida } = await supabase.storage.from("entregas").upload(ruta, archivo);
+      const { error: errSubida } = await supabaseClient.storage.from("entregas").upload(ruta, archivo);
 
       if (errSubida) {
         msgForm.innerHTML = `<span class="err">No se pudo subir el archivo: ${errSubida.message}</span>`;
@@ -236,10 +228,10 @@ async function cargarEquipo(codigoAlumno) {
         btn.textContent = "Registrar entrenamiento completado";
         return;
       }
-      archivoUrl = supabase.storage.from("entregas").getPublicUrl(ruta).data.publicUrl;
+      archivoUrl = supabaseClient.storage.from("entregas").getPublicUrl(ruta).data.publicUrl;
     }
 
-    const { error } = await supabase.from("registros_practica").insert({
+    const { error } = await supabaseClient.from("registros_practica").insert({
       codAlumno: codigoAlumno,
       codigoEq: equipoId,
       codEv: practica.codEv,
